@@ -1,3 +1,6 @@
+Ee code emo index.html
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,18 +31,75 @@
             display: block;
             margin-top: 10px;
         }
-        #recordingStatus {
-            margin-top: 20px;
-            font-weight: bold;
+        #recordedAudio {
+            margin-top: 15px;
         }
     </style>
-</head>
-<body>
-    <h1>Text-to-Speech & Speech-to-Text</h1>
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingCount = 0;
 
+        function startRecording() {
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                mediaRecorder.addEventListener("dataavailable", event => {
+                    audioChunks.push(event.data);
+                });
+
+                document.getElementById("status").innerText = "Recording...";
+            });
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+
+            mediaRecorder.addEventListener("stop", () => {
+                recordingCount++;
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const audioURL = URL.createObjectURL(audioBlob);
+
+                // Create a new audio element for each recording
+                const recordingsContainer = document.getElementById("recordings");
+
+                const audioElement = document.createElement("audio");
+                audioElement.controls = true;
+                audioElement.src = audioURL;
+
+                const transcriptElement = document.createElement("p");
+                transcriptElement.id = transcript-${recordingCount};
+                transcriptElement.innerText = "Transcribing...";
+
+                const recordingDiv = document.createElement("div");
+                recordingDiv.appendChild(audioElement);
+                recordingDiv.appendChild(transcriptElement);
+                recordingsContainer.appendChild(recordingDiv);
+
+                const formData = new FormData();
+                formData.append("audio", audioBlob);
+                formData.append("filename", recording_${recordingCount}.wav);
+
+                fetch("/transcribe", {
+                    method: "POST",
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    transcriptElement.innerText = data.transcript;
+                });
+
+                audioChunks = []; // Clear audio chunks for the next recording
+                document.getElementById("status").innerText = "";
+            });
+        }
+    </script>
+</head>
+<body>    
     <!-- Text-to-Speech Form -->
     <form method="POST" enctype="multipart/form-data">
-        <h2>Text-to-Speech</h2>
+        <h1>Text-to-Speech</h1>
         <textarea name="text" placeholder="Enter text to convert to speech"></textarea>
         <button type="submit">Convert to Speech</button>
     </form>
@@ -53,74 +113,12 @@
         {% endif %}
     {% endfor %}
 
-    <!-- Speech-to-Text Recording -->
-    <h2>Speech-to-Text (Record Audio)</h2>
-    <button id="startRecordingBtn">Start Recording</button>
-    <button id="stopRecordingBtn" style="display:none;" disabled>Stop Recording</button>
-    <div id="recordingStatus"></div>
-    <form id="recordingForm" method="POST" enctype="multipart/form-data" style="display:none;">
-        <input type="file" name="audio_data" id="audioDataInput" accept="audio/wav">
-        <button type="submit">Upload Audio</button>
-    </form>
+    <h1>Speech to Text</h1>
+    <button onclick="startRecording()">Record</button>
+    <button onclick="stopRecording()">Stop</button>
+    <p id="status"></p>
+    <h3>Recordings:</h3>
+    <div id="recordings"></div>
 
-    <h3>Transcriptions</h3>
-    {% for transcription in transcription_files %}
-        <a href="{{ url_for('static', filename='audio/' + transcription) }}" target="_blank">{{ transcription }}</a>
-    {% endfor %}
-
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-
-        // Start recording when button is clicked
-        document.getElementById('startRecordingBtn').addEventListener('click', async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.start();
-
-            mediaRecorder.ondataavailable = event => {
-                audioChunks.push(event.data);
-            };
-
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audioFile = new File([audioBlob], 'recorded_audio.wav', { type: 'audio/wav' });
-
-                // Show status
-                document.getElementById('recordingStatus').textContent = "Recording stopped. Please upload the audio.";
-
-                // Create FormData object and append the file
-                const formData = new FormData();
-                formData.append('audio_data', audioFile);
-
-                // Prepare the form for uploading
-                const inputFile = document.getElementById('audioDataInput');
-                inputFile.files = null; // Reset any previous files
-                const dataTransfer = new DataTransfer();
-                dataTransfer.items.add(audioFile);
-                inputFile.files = dataTransfer.files;
-
-                // Show the upload form
-                document.getElementById('recordingForm').style.display = 'block';
-            };
-
-            // Disable Start and Enable Stop Button
-            document.getElementById('startRecordingBtn').disabled = true;
-            document.getElementById('stopRecordingBtn').style.display = 'inline';
-            document.getElementById('stopRecordingBtn').disabled = false;
-        });
-
-        // Stop recording when button is clicked
-        document.getElementById('stopRecordingBtn').addEventListener('click', () => {
-            mediaRecorder.stop();
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
-
-            // Disable Stop and Enable Start Button
-            document.getElementById('stopRecordingBtn').style.display = 'none';
-            document.getElementById('stopRecordingBtn').disabled = true;
-            document.getElementById('startRecordingBtn').disabled = false;
-        });
-    </script>
 </body>
 </html>
