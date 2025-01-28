@@ -1,6 +1,3 @@
-Ee code emo index.html
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,66 +32,6 @@ Ee code emo index.html
             margin-top: 15px;
         }
     </style>
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-        let recordingCount = 0;
-
-        function startRecording() {
-            navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.start();
-
-                mediaRecorder.addEventListener("dataavailable", event => {
-                    audioChunks.push(event.data);
-                });
-
-                document.getElementById("status").innerText = "Recording...";
-            });
-        }
-
-        function stopRecording() {
-            mediaRecorder.stop();
-
-            mediaRecorder.addEventListener("stop", () => {
-                recordingCount++;
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const audioURL = URL.createObjectURL(audioBlob);
-
-                // Create a new audio element for each recording
-                const recordingsContainer = document.getElementById("recordings");
-
-                const audioElement = document.createElement("audio");
-                audioElement.controls = true;
-                audioElement.src = audioURL;
-
-                const transcriptElement = document.createElement("p");
-                transcriptElement.id = transcript-${recordingCount};
-                transcriptElement.innerText = "Transcribing...";
-
-                const recordingDiv = document.createElement("div");
-                recordingDiv.appendChild(audioElement);
-                recordingDiv.appendChild(transcriptElement);
-                recordingsContainer.appendChild(recordingDiv);
-
-                const formData = new FormData();
-                formData.append("audio", audioBlob);
-                formData.append("filename", recording_${recordingCount}.wav);
-
-                fetch("/transcribe", {
-                    method: "POST",
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    transcriptElement.innerText = data.transcript;
-                });
-
-                audioChunks = []; // Clear audio chunks for the next recording
-                document.getElementById("status").innerText = "";
-            });
-        }
-    </script>
 </head>
 <body>    
     <!-- Text-to-Speech Form -->
@@ -106,7 +43,7 @@ Ee code emo index.html
 
     <h3>Generated Audio Files</h3>
     {% for audio in audio_files %}
-        {% if audio.endswith('.mp3') %}
+        {% if audio.endswith('.wav') %}
         <audio controls>
             <source src="{{ url_for('static', filename='audio/' + audio) }}" type="audio/mpeg">
         </audio>
@@ -114,11 +51,11 @@ Ee code emo index.html
     {% endfor %}
 
     <h1>Speech to Text</h1>
-    <button onclick="startRecording()">Record</button>
-    <button onclick="stopRecording()">Stop</button>
-    <p id="status"></p>
-    <h3>Recordings:</h3>
-    <div id="recordings"></div>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".wav" required>
+        <button type="submit">Upload and Transcribe</button>
+    </form>
 
 </body>
+
 </html>
